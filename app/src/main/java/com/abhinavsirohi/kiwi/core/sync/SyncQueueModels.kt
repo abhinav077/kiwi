@@ -3,6 +3,10 @@ package com.abhinavsirohi.kiwi.core.sync
 enum class SyncRecordType {
     TASK,
     SUBTASK,
+    PROFILE,
+    CYCLE_RECORD,
+    WELLNESS_DAILY_RECORD,
+    HEALTH_ALERT_EPISODE,
 }
 
 enum class SyncOperation {

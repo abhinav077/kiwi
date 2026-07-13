@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.abhinavsirohi.kiwi.data.local.entity.SubtaskEntity
 import com.abhinavsirohi.kiwi.data.local.entity.TaskEntity
+import com.abhinavsirohi.kiwi.data.local.entity.ProfileEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -46,8 +47,8 @@ class KiwiDatabaseTest {
         database.taskDao().upsertTask(task)
         database.taskDao().upsertSubtask(subtask)
 
-        assertEquals(task, database.taskDao().observeActiveTasks().first().single())
-        assertEquals(subtask, database.taskDao().observeActiveSubtasks(task.localId).first().single())
+        assertEquals(task, database.taskDao().observeActiveTasks("user-1").first().single())
+        assertEquals(subtask, database.taskDao().observeActiveSubtasks(task.localId, "user-1").first().single())
         assertEquals(listOf(task), database.taskDao().getTasksAwaitingSync())
         assertEquals(listOf(subtask), database.taskDao().getSubtasksAwaitingSync())
     }
@@ -62,8 +63,22 @@ class KiwiDatabaseTest {
 
         database.taskDao().upsertTask(task)
 
-        assertTrue(database.taskDao().observeActiveTasks().first().isEmpty())
+        assertTrue(database.taskDao().observeActiveTasks("user-1").first().isEmpty())
         assertEquals(listOf(task), database.taskDao().getTasksAwaitingSync())
+    }
+
+    @Test
+    fun profile_roundTripsWithOwnershipAndPendingSyncMetadata() = runBlocking {
+        val profile = ProfileEntity(
+            localId = "user-1",
+            preferredName = "Abhi",
+            syncMetadata = metadata(),
+        )
+
+        database.profileDao().upsert(profile)
+
+        assertEquals(profile, database.profileDao().findByUserId("user-1"))
+        assertEquals(listOf(profile), database.profileDao().getAwaitingSync())
     }
 
     private fun metadata(

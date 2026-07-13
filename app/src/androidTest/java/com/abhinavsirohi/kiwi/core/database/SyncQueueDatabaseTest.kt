@@ -9,6 +9,7 @@ import com.abhinavsirohi.kiwi.core.sync.SyncQueueState
 import com.abhinavsirohi.kiwi.core.sync.SyncRecordType
 import com.abhinavsirohi.kiwi.data.local.entity.PendingChangeEntity
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -76,6 +77,31 @@ class SyncQueueDatabaseTest {
         dao.recoverInterruptedChanges()
 
         assertEquals(SyncQueueState.PENDING, dao.findById(QUEUE_ID)?.state)
+    }
+
+    @Test
+    fun plannerQueueState_isObservableAndExcludesNonPlannerRecords() = runBlocking {
+        val dao = database.pendingChangeDao()
+        dao.enqueue(change())
+        dao.enqueue(
+            change().copy(
+                queueId = "PROFILE:user-1",
+                recordType = SyncRecordType.PROFILE,
+                recordLocalId = "user-1",
+                updatedAt = 2_000L,
+            ),
+        )
+
+        assertEquals(1, dao.observePlannerPendingCount().first())
+        assertEquals(0, dao.observePlannerProcessingCount().first())
+        assertEquals(0, dao.observePlannerFailedCount().first())
+
+        dao.claimEligible(now = 1_000L, limit = 1)
+        assertEquals(1, dao.observePlannerProcessingCount().first())
+
+        dao.markPermanentlyFailed(QUEUE_ID, failedAt = 2_000L, error = "offline")
+        assertEquals(0, dao.observePlannerProcessingCount().first())
+        assertEquals(1, dao.observePlannerFailedCount().first())
     }
 
     private fun change(

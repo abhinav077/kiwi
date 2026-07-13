@@ -6,6 +6,7 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import com.abhinavsirohi.kiwi.core.sync.SyncQueueState
 import com.abhinavsirohi.kiwi.data.local.entity.PendingChangeEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PendingChangeDao {
@@ -55,4 +56,22 @@ interface PendingChangeDao {
 
     @Query("SELECT COUNT(*) FROM pending_changes")
     suspend fun count(): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM pending_changes " +
+            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'PENDING'",
+    )
+    fun observePlannerPendingCount(): Flow<Int>
+
+    @Query(
+        "SELECT COUNT(*) FROM pending_changes " +
+            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'PROCESSING'",
+    )
+    fun observePlannerProcessingCount(): Flow<Int>
+
+    @Query(
+        "SELECT COUNT(*) FROM pending_changes " +
+            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'FAILED'",
+    )
+    fun observePlannerFailedCount(): Flow<Int>
 }

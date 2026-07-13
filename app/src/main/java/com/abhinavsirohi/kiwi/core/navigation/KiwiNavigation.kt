@@ -39,6 +39,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.NavHostController
 import com.abhinavsirohi.kiwi.core.design.KiwiBackground
+import com.abhinavsirohi.kiwi.feature.onboarding.WelcomeScreen
+import com.abhinavsirohi.kiwi.feature.onboarding.GoogleSignInRoute
+import com.abhinavsirohi.kiwi.feature.onboarding.ApprovedUserRoute
+import com.abhinavsirohi.kiwi.feature.onboarding.MinimalSetupRoute
+import com.abhinavsirohi.kiwi.feature.onboarding.SessionRestorationRoute
+import com.abhinavsirohi.kiwi.feature.today.TodayRoute
+import com.abhinavsirohi.kiwi.feature.calendar.CalendarRoute
+import com.abhinavsirohi.kiwi.feature.wellness.WellnessRoute
 import com.abhinavsirohi.kiwi.ui.theme.KiwiCharcoal
 import com.abhinavsirohi.kiwi.ui.theme.KiwiDimensions
 import com.abhinavsirohi.kiwi.ui.theme.KiwiSpacing
@@ -55,12 +63,17 @@ fun KiwiApp() {
         contentWindowInsets = WindowInsets.safeDrawing,
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         bottomBar = {
-            KiwiBottomDock(
-                currentDestination = currentDestination,
-                onDestinationSelected = { destination ->
-                    navController.navigateTo(destination)
-                }
-            )
+            if (currentDestination?.route in KiwiDestination.entries
+                    .filter(KiwiDestination::appearsInBottomDock)
+                    .map(KiwiDestination::route)
+            ) {
+                KiwiBottomDock(
+                    currentDestination = currentDestination,
+                    onDestinationSelected = { destination ->
+                        navController.navigateTo(destination)
+                    }
+                )
+            }
         }
     ) { innerPadding ->
         BoxWithConstraints(
@@ -86,19 +99,98 @@ private fun KiwiNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = KiwiDestination.Today.route,
+        startDestination = KiwiDestination.SessionRestore.route,
         modifier = modifier
     ) {
-        KiwiDestination.entries.forEach { destination ->
-            composable(destination.route) {
-                KiwiPlaceholderScreen(destination = destination)
-            }
+        composable(KiwiDestination.SessionRestore.route) {
+            SessionRestorationRoute(
+                onSignedOut = { returningUser ->
+                    val destination = if (returningUser) {
+                        KiwiDestination.SignIn
+                    } else {
+                        KiwiDestination.Welcome
+                    }
+                    navController.navigate(destination.route) {
+                        popUpTo(KiwiDestination.SessionRestore.route) { inclusive = true }
+                    }
+                },
+                onAccessDenied = {
+                    navController.navigate(KiwiDestination.AccessGate.route) {
+                        popUpTo(KiwiDestination.SessionRestore.route) { inclusive = true }
+                    }
+                },
+                onNeedsProfileSetup = {
+                    navController.navigate(KiwiDestination.ProfileSetup.route) {
+                        popUpTo(KiwiDestination.SessionRestore.route) { inclusive = true }
+                    }
+                },
+                onOpenToday = {
+                    navController.navigate(KiwiDestination.Today.route) {
+                        popUpTo(KiwiDestination.SessionRestore.route) { inclusive = true }
+                    }
+                },
+            )
         }
+        composable(KiwiDestination.Welcome.route) {
+            WelcomeScreen(onContinue = { navController.navigate(KiwiDestination.SignIn.route) })
+        }
+        composable(KiwiDestination.SignIn.route) {
+            GoogleSignInRoute(
+                onAuthenticated = {
+                    navController.navigate(KiwiDestination.SessionRestore.route) {
+                        popUpTo(KiwiDestination.SignIn.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(KiwiDestination.AccessGate.route) {
+            ApprovedUserRoute(
+                onApproved = {
+                    navController.navigate(KiwiDestination.ProfileSetup.route) {
+                        popUpTo(KiwiDestination.AccessGate.route) { inclusive = true }
+                    }
+                },
+                onSignedOut = {
+                    navController.navigate(KiwiDestination.SignIn.route) {
+                        popUpTo(KiwiDestination.AccessGate.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(KiwiDestination.ProfileSetup.route) {
+            MinimalSetupRoute(
+                onComplete = {
+                    navController.navigate(KiwiDestination.Today.route) {
+                        popUpTo(KiwiDestination.ProfileSetup.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(KiwiDestination.Assistant.route) {
+            KiwiPlaceholderScreen(KiwiDestination.Assistant, message = "Ask Kiwi will be ready soon.")
+        }
+        KiwiDestination.entries
+            .filter(KiwiDestination::appearsInBottomDock)
+            .forEach { destination ->
+                composable(destination.route) {
+                    when (destination) {
+                        KiwiDestination.Today -> TodayRoute(onAskKiwi = {
+                            navController.navigate(KiwiDestination.Assistant.route)
+                        })
+                        KiwiDestination.Calendar -> CalendarRoute()
+                        KiwiDestination.Wellness -> WellnessRoute()
+                        else -> KiwiPlaceholderScreen(destination = destination)
+                    }
+                }
+            }
     }
 }
 
 @Composable
-private fun KiwiPlaceholderScreen(destination: KiwiDestination) {
+private fun KiwiPlaceholderScreen(
+    destination: KiwiDestination,
+    message: String = "Placeholder destination"
+) {
     KiwiBackground(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -118,7 +210,7 @@ private fun KiwiPlaceholderScreen(destination: KiwiDestination) {
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Placeholder destination",
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = KiwiWarmGray
             )
@@ -148,16 +240,18 @@ private fun KiwiBottomDock(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            KiwiDestination.entries.forEach { destination ->
-                val selected = currentDestination?.hierarchy?.any {
-                    it.route == destination.route
-                } == true
-                KiwiDockItem(
-                    destination = destination,
-                    selected = selected,
-                    onClick = { onDestinationSelected(destination) }
-                )
-            }
+            KiwiDestination.entries
+                .filter(KiwiDestination::appearsInBottomDock)
+                .forEach { destination ->
+                    val selected = currentDestination?.hierarchy?.any {
+                        it.route == destination.route
+                    } == true
+                    KiwiDockItem(
+                        destination = destination,
+                        selected = selected,
+                        onClick = { onDestinationSelected(destination) }
+                    )
+                }
         }
     }
 }

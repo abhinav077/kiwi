@@ -71,7 +71,7 @@ class RoomRestoreDatabaseWriterTest {
         writer.applySnapshot(RestoreSnapshot(tasks = listOf(tombstone), subtasks = emptyList()))
 
         assertNotNull(database.taskDao().findTask("deleted-task"))
-        assertTrue(database.taskDao().observeActiveTasks().first().isEmpty())
+        assertTrue(database.taskDao().observeActiveTasks(USER_ID).first().isEmpty())
     }
 
     private fun localTask(localId: String, updatedAt: Long) = TaskEntity(

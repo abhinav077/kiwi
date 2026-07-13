@@ -2,6 +2,9 @@ package com.abhinavsirohi.kiwi.domain.usecase.task
 
 import com.abhinavsirohi.kiwi.core.common.AppResult
 import com.abhinavsirohi.kiwi.domain.model.RecordMetadata
+import com.abhinavsirohi.kiwi.domain.model.NewTask
+import com.abhinavsirohi.kiwi.domain.model.NewSubtask
+import com.abhinavsirohi.kiwi.domain.model.PlannerSyncState
 import com.abhinavsirohi.kiwi.domain.model.Subtask
 import com.abhinavsirohi.kiwi.domain.model.Task
 import com.abhinavsirohi.kiwi.domain.repository.TaskRepository
@@ -26,6 +29,7 @@ class TaskUseCasesTest {
         assertEquals(repository.tasksResult, ObserveTasks(repository)().single())
         assertEquals(repository.subtasksResult, ObserveSubtasks(repository)(task.localId).single())
         assertEquals(task.localId, repository.observedSubtasksTaskId)
+        assertEquals(repository.syncState, ObservePlannerSyncState(repository)().single())
     }
 
     @Test
@@ -86,6 +90,7 @@ private class FakeTaskRepository : TaskRepository {
     var tombstonedTask: Pair<String, Long>? = null
     var tombstonedSubtask: Pair<String, Long>? = null
     var saveTaskResult: AppResult<Unit> = AppResult.Success(Unit)
+    val syncState = PlannerSyncState(pendingCount = 2)
 
     override fun observeTasks(): Flow<AppResult<List<Task>>> = flowOf(tasksResult)
 
@@ -93,6 +98,35 @@ private class FakeTaskRepository : TaskRepository {
         observedSubtasksTaskId = taskLocalId
         return flowOf(subtasksResult)
     }
+
+    override fun observePlannerSyncState(): Flow<PlannerSyncState> = flowOf(syncState)
+
+    override suspend fun createTask(task: NewTask): AppResult<Task> = AppResult.Success(
+        Task(
+            localId = "created-task",
+            title = task.title,
+            metadata = RecordMetadata(
+                userId = "user-1",
+                createdAt = 1_000L,
+                updatedAt = 1_000L,
+                deviceId = "device-1",
+            ),
+        ),
+    )
+
+    override suspend fun createSubtask(subtask: NewSubtask): AppResult<Subtask> = AppResult.Success(
+        Subtask(
+            localId = "created-subtask",
+            taskLocalId = subtask.taskLocalId,
+            title = subtask.title,
+            metadata = RecordMetadata(
+                userId = "user-1",
+                createdAt = 1_000L,
+                updatedAt = 1_000L,
+                deviceId = "device-1",
+            ),
+        ),
+    )
 
     override suspend fun saveTask(task: Task): AppResult<Unit> {
         savedTask = task
@@ -113,4 +147,6 @@ private class FakeTaskRepository : TaskRepository {
         tombstonedSubtask = localId to deletedAt
         return AppResult.Success(Unit)
     }
+
+    override suspend fun moveSubtask(localId: String, direction: Int): AppResult<Unit> = AppResult.Success(Unit)
 }

@@ -2,6 +2,16 @@
 
 Use these messages in the Codex VS Code chat. Replace angle-bracket values and leave the defaults when they are correct.
 
+<!-- install -->
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+<!-- start the app -->
+adb shell am start -n com.abhinavsirohi.kiwi/.MainActivity
+
+<!-- stop the app -->
+adb shell am force-stop com.abhinavsirohi.kiwi
+
 ## 1. Start a new chat
 
 Send:
