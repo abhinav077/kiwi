@@ -7,6 +7,9 @@ enum class SyncRecordType {
     CYCLE_RECORD,
     WELLNESS_DAILY_RECORD,
     HEALTH_ALERT_EPISODE,
+    DIARY_ENTRY,
+    DIARY_PHOTO,
+    SELF_CARE_ROUTINE,
 }
 
 enum class SyncOperation {

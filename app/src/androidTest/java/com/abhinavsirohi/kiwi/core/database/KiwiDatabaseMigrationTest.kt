@@ -228,6 +228,59 @@ class KiwiDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migrate9To10_preservesDiaryEntriesAndCreatesDiaryPhotos() {
+        helper.createDatabase(TEST_DATABASE, 9).apply {
+            execSQL(
+                "INSERT INTO diary_entries (localId, title, content, entry_date, best_thing, mood, " +
+                    "is_favourite, remote_id, user_id, created_at, updated_at, deleted_at, sync_status, " +
+                    "last_sync_error, device_id) VALUES ('entry-1', 'A day', 'Writing', '2026-07-14', " +
+                    "NULL, NULL, 0, NULL, 'user-1', 1000, 1000, NULL, 'PENDING', NULL, 'device-1')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            10,
+            true,
+            KiwiDatabase.MIGRATION_9_10,
+        ).use { database ->
+            database.query("SELECT title FROM diary_entries WHERE localId = 'entry-1'").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("A day", cursor.getString(0))
+            }
+            database.query("SELECT COUNT(*) FROM diary_photos").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate10To11_preservesDiaryPhotosAndCreatesSelfCareRoutines() {
+        helper.createDatabase(TEST_DATABASE, 10).apply {
+            execSQL(
+                "INSERT INTO diary_entries (localId, title, content, entry_date, best_thing, mood, " +
+                    "is_favourite, remote_id, user_id, created_at, updated_at, deleted_at, sync_status, " +
+                    "last_sync_error, device_id) VALUES ('entry-10', 'A day', 'Writing', '2026-07-14', " +
+                    "NULL, NULL, 0, NULL, 'user-1', 1000, 1000, NULL, 'PENDING', NULL, 'device-1')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DATABASE, 11, true, KiwiDatabase.MIGRATION_10_11).use { database ->
+            database.query("SELECT COUNT(*) FROM diary_photos").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+            database.query("SELECT COUNT(*) FROM self_care_routines").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE = "kiwi-migration-test"
     }

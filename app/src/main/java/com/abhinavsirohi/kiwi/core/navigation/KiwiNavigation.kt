@@ -47,6 +47,8 @@ import com.abhinavsirohi.kiwi.feature.onboarding.SessionRestorationRoute
 import com.abhinavsirohi.kiwi.feature.today.TodayRoute
 import com.abhinavsirohi.kiwi.feature.calendar.CalendarRoute
 import com.abhinavsirohi.kiwi.feature.wellness.WellnessRoute
+import com.abhinavsirohi.kiwi.feature.diary.DiaryRoute
+import com.abhinavsirohi.kiwi.feature.selfcare.SelfCareRoute
 import com.abhinavsirohi.kiwi.ui.theme.KiwiCharcoal
 import com.abhinavsirohi.kiwi.ui.theme.KiwiDimensions
 import com.abhinavsirohi.kiwi.ui.theme.KiwiSpacing
@@ -179,6 +181,8 @@ private fun KiwiNavHost(
                         })
                         KiwiDestination.Calendar -> CalendarRoute()
                         KiwiDestination.Wellness -> WellnessRoute()
+                        KiwiDestination.Diary -> DiaryRoute()
+                        KiwiDestination.SelfCare -> SelfCareRoute()
                         else -> KiwiPlaceholderScreen(destination = destination)
                     }
                 }

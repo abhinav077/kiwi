@@ -16,5 +16,6 @@ enum class KiwiDestination(
     Wellness(route = "wellness", label = "Wellness", symbol = "✿"),
     Diary(route = "diary", label = "Diary", symbol = "✎"),
     Assistant(route = "assistant", label = "Ask Kiwi", symbol = "✦", appearsInBottomDock = false),
-    More(route = "more", label = "More", symbol = "⋯")
+    SelfCare(route = "self-care", label = "Self-care", symbol = "♡"),
+    More(route = "more", label = "More", symbol = "⋯", appearsInBottomDock = false)
 }

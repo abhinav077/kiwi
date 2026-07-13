@@ -17,6 +17,11 @@ import com.abhinavsirohi.kiwi.data.local.entity.SubtaskEntity
 import com.abhinavsirohi.kiwi.data.local.entity.TaskEntity
 import com.abhinavsirohi.kiwi.data.local.entity.WellnessDailyRecordEntity
 import com.abhinavsirohi.kiwi.data.local.entity.HealthAlertEpisodeEntity
+import com.abhinavsirohi.kiwi.data.local.entity.DiaryEntryEntity
+import com.abhinavsirohi.kiwi.data.local.dao.DiaryDao
+import com.abhinavsirohi.kiwi.data.local.entity.DiaryPhotoEntity
+import com.abhinavsirohi.kiwi.data.local.dao.SelfCareDao
+import com.abhinavsirohi.kiwi.data.local.entity.SelfCareRoutineEntity
 
 @Database(
     entities = [
@@ -27,8 +32,11 @@ import com.abhinavsirohi.kiwi.data.local.entity.HealthAlertEpisodeEntity
         CycleRecordEntity::class,
         WellnessDailyRecordEntity::class,
         HealthAlertEpisodeEntity::class,
+        DiaryEntryEntity::class,
+        DiaryPhotoEntity::class,
+        SelfCareRoutineEntity::class,
     ],
-    version = 8,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(KiwiTypeConverters::class)
@@ -42,6 +50,10 @@ abstract class KiwiDatabase : RoomDatabase() {
     abstract fun wellnessDao(): WellnessDao
 
     abstract fun healthAlertDao(): HealthAlertDao
+
+    abstract fun diaryDao(): DiaryDao
+
+    abstract fun selfCareDao(): SelfCareDao
 
     companion object {
         const val DATABASE_NAME = "kiwi.db"
@@ -175,6 +187,59 @@ abstract class KiwiDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `diary_entries` (" +
+                        "`localId` TEXT NOT NULL, `title` TEXT NOT NULL, `content` TEXT NOT NULL, " +
+                        "`entry_date` TEXT NOT NULL, `best_thing` TEXT, `mood` TEXT, `is_favourite` INTEGER NOT NULL, " +
+                        "`remote_id` TEXT, `user_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `sync_status` TEXT NOT NULL, " +
+                        "`last_sync_error` TEXT, `device_id` TEXT NOT NULL, PRIMARY KEY(`localId`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_diary_entries_user_id_entry_date` ON `diary_entries` (`user_id`, `entry_date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_diary_entries_user_id_updated_at` ON `diary_entries` (`user_id`, `updated_at`)")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `diary_photos` (" +
+                        "`localId` TEXT NOT NULL, `diary_entry_local_id` TEXT NOT NULL, " +
+                        "`local_path` TEXT NOT NULL, `remote_path` TEXT, `mime_type` TEXT NOT NULL, " +
+                        "`width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `byte_size` INTEGER NOT NULL, " +
+                        "`remote_id` TEXT, `user_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `sync_status` TEXT NOT NULL, " +
+                        "`last_sync_error` TEXT, `device_id` TEXT NOT NULL, PRIMARY KEY(`localId`), " +
+                        "FOREIGN KEY(`diary_entry_local_id`) REFERENCES `diary_entries`(`localId`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_diary_photos_diary_entry_local_id` " +
+                        "ON `diary_photos` (`diary_entry_local_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_diary_photos_user_id_updated_at` " +
+                        "ON `diary_photos` (`user_id`, `updated_at`)",
+                )
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `self_care_routines` (" +
+                        "`localId` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, " +
+                        "`category` TEXT NOT NULL, `scheduledTimeMinutes` INTEGER, `repeatDays` TEXT NOT NULL, " +
+                        "`checklist` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `completionDates` TEXT NOT NULL, " +
+                        "`remote_id` TEXT, `user_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `sync_status` TEXT NOT NULL, " +
+                        "`last_sync_error` TEXT, `device_id` TEXT NOT NULL, PRIMARY KEY(`localId`))",
+                )
+            }
+        }
+
         val MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -183,6 +248,9 @@ abstract class KiwiDatabase : RoomDatabase() {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
         )
     }
 }

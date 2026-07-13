@@ -10,6 +10,9 @@ import com.abhinavsirohi.kiwi.data.remote.KiwiSupabaseClient
 import com.abhinavsirohi.kiwi.data.remote.RemoteResult
 import com.abhinavsirohi.kiwi.data.remote.SupabaseConfiguration
 import io.github.jan.supabase.SupabaseClient
+import com.abhinavsirohi.kiwi.data.local.AndroidDiaryPhotoLocalStore
+import com.abhinavsirohi.kiwi.core.sync.WorkManagerDiaryPhotoSyncScheduler
+import com.abhinavsirohi.kiwi.core.notifications.AlarmManagerSelfCareReminderScheduler
 
 class KiwiApplication : Application() {
     val database: KiwiDatabase by lazy {
@@ -29,4 +32,7 @@ class KiwiApplication : Application() {
 
     val taskReminderScheduler by lazy { AlarmManagerTaskReminderScheduler(this) }
     val healthAlertNotificationScheduler by lazy { AlarmManagerHealthAlertNotificationScheduler(this) }
+    val diaryPhotoLocalStore by lazy { AndroidDiaryPhotoLocalStore(this) }
+    val diaryPhotoSyncScheduler by lazy { WorkManagerDiaryPhotoSyncScheduler(this) }
+    val selfCareReminderScheduler by lazy { AlarmManagerSelfCareReminderScheduler(this) }
 }

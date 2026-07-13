@@ -10,10 +10,10 @@
 
 ## Current checkpoint
 
-- Current phase: Phase 5 — Wellness tracker
-- Current task: 5.5 Health alerts
-- Status: COMPLETE
-- Active model: Sol for health-safe pattern episodes and private notifications
+- Current phase: Phase 7 — Self-care
+- Current task: 7. Self-care routines
+- Status: NEEDS_REVIEW
+- Active model: Sol
 
 ## Setup completed
 
@@ -65,6 +65,10 @@
 | 5.3 | Implement wellness interface | COMPLETE | Sol | Unit/build and 27 instrumented tests passed on physical tablet |
 | 5.4 | Implement historical analytics | COMPLETE | Sol | Focused unit/build and 27 instrumented tests passed on physical tablet |
 | 5.5 | Implement health alerts | COMPLETE | Sol | Unit/build and 29 instrumented tests passed on physical tablet |
+| 6.1 | Implement diary entries | COMPLETE | Luna | Focused unit/build verification passed; Room migration and device verification pending if separately approved |
+| 6.2 | Implement diary photos | COMPLETE | Sol | Unit/build, 31 tablet tests, migration launch, and live private Storage upload/delete round trip passed |
+| 6.3 | Implement diary experience | NEEDS_REVIEW | Luna | Unit/build and 31 tablet tests passed; cold launch passed, authenticated Diary UI walkthrough pending |
+| 7 | Implement self-care routines | NEEDS_REVIEW | Sol | Unit/build, 32 tablet tests, migration 10→11, authenticated Self-care route/editor walkthrough passed; remote processing pending |
 
 ## Update protocol
 
@@ -434,3 +438,46 @@ After every task, record:
 - Verification: `./gradlew testDebugUnitTest assembleDebug --console=plain` — PASS, including detection and quiet-hour tests; `./gradlew connectedDebugAndroidTest --console=plain` — PASS with 29 tests on `SM-X115 - 16`, including migration 7→8 and Room episode deduplication/single-notification/acknowledgement/resolution; `git diff --check`, schema-8 presence, and focused secret checks — PASS.
 - Known limitations: notification permission still depends on the existing Android runtime permission state; health notifications and the new caution cards were not manually triggered on-device. Production Supabase processing remains unavailable until a remote alert schema and RLS contract are separately approved.
 - Next unblocked task: Phase 6, Task 6.1, pending separate user approval.
+
+### 2026-07-14 — Phase 6, Task 6.1 diary entries
+
+- Model: Luna.
+- Reading mode: new chat with insufficient context; only the approved project overview, Phase 6/Task 6.1 build-plan section, architecture, code standards, progress tracker, and directly involved Room, sync, navigation, repository, and Compose paths were read.
+- Files changed: diary entity/DAO/domain/repository/use cases, Room database version 9 migration, diary ViewModel/screen, navigation and sync-record wiring, focused diary use-case tests, and this tracker.
+- Behaviour: added local-first diary entries with title, writing content, date, best thing today, mood, favourite flag, timestamps, edit, confirmation-gated delete, search across entry text and metadata, and calm loading/empty/error states. Changes are saved to Room before a stable pending backup-sync record is queued.
+- Verification: `./gradlew testDebugUnitTest assembleDebug --console=plain` — PASS after one callable-reference compile correction; 46 actionable tasks. Focused diary validation tests passed with the full unit suite.
+- Known limitation: physical-device migration/runtime verification and production Supabase diary processing were not run or added; remote schema/RLS processing remains outside Task 6.1's approved scope.
+- Next unblocked task: Phase 6, Task 6.2 Diary photos, pending separate user approval.
+
+### 2026-07-14 — Phase 6, Task 6.2 diary photos
+
+- Model: Sol.
+- Reading mode: continuing chat, different feature in the same phase with insufficient context; reused Task 6.1 diary context and read only the approved Task 6.2 build-plan, project overview, architecture, code standards, tracker, and directly involved diary/Room/sync/Supabase/application/Gradle/test files.
+- Files changed: Supabase Storage dependency/client registration; diary-photo local store, entity, DAO, domain/repository/use cases, photo sync worker/scheduler, application wiring, Diary ViewModel/screen, Room migration/schema, focused migration/repository tests, and this tracker.
+- Behaviour: selected images are decoded, resized to a maximum 1600-pixel edge, compressed as JPEG at quality 82, and copied into Kiwi's private internal files before Room is updated. Local previews remain available offline. Each photo uses an authenticated user-scoped private Storage path and a stable pending-change record; a network-constrained WorkManager job uploads or safely deletes the remote object with retry behavior. Removing a photo or deleting its parent diary entry creates a tombstone and queues remote cleanup; the private local file is retained until remote deletion succeeds.
+- Persistence and privacy: database version 10 adds user-owned `diary_photos` linked to `diary_entries`, with local/remote paths, dimensions, byte size, timestamps, sync/error state, and deletion metadata. No media permission, service-role key, public URL, or shared external-storage copy is used.
+- Verification: `./gradlew testDebugUnitTest assembleDebug --console=plain` — PASS; `./gradlew connectedDebugAndroidTest --console=plain` — PASS with 31 tests on `SM-X115 - 16`, including migration 9→10 and transactional local photo/queue/tombstone coverage; `./gradlew installDebug --console=plain` — PASS; cold launch after installation — PASS; `git diff --check` and focused secret/generated-output checks — PASS.
+- Live verification/status: after authentication was completed on the connected tablet, one existing device photo was selected for a temporary diary entry. The UI showed local save and preview; Room inspection showed the deterministic authenticated private Storage path and `SYNCED` after upload. Removing the photo hid the preview; after worker completion, the same photo tombstone had `deleted_at` set and `SYNCED`, confirming the authenticated remote cleanup path completed. The temporary diary entry was then deleted and no longer appeared in the active diary list. No authentication bypass or fake photo data was used. Status: `COMPLETE`.
+- Next unblocked task: Phase 6, Task 6.3 Diary experience, pending separate user approval.
+
+### 2026-07-14 — Phase 6, Task 6.3 diary experience
+
+- Model: Luna.
+- Reading mode: continuing chat, different task in the same phase; reused established Task 6.1 and 6.2 diary context and read only the approved Task 6.3 build-plan section, project overview, architecture, code standards, tracker, and directly involved diary/navigation/design/test paths.
+- Files changed: diary screen and ViewModel, and this tracker.
+- Behaviour: added an intimate diary header with a privacy and lock entry point, month calendar navigation with date filtering, favourites filtering, search/filter clearing, accessible date semantics, and calm filtered/empty states. Existing local-first writing, edit/delete confirmation, photo preview, and offline messaging remain intact.
+- Privacy boundary: the new entry point explains current local-first/private-storage behavior without inventing a new PIN or biometric mechanism; no authentication, Room schema, sync, or security contract changed.
+- Verification: `./gradlew compileDebugKotlin --console=plain` — PASS; `./gradlew testDebugUnitTest assembleDebug --console=plain` — PASS; `./gradlew connectedDebugAndroidTest --console=plain` — PASS with 31 tests on `SM-X115 - 16`; `./gradlew installDebug --console=plain` — PASS; cold launch — PASS; `git diff --check` and focused secret checks — PASS.
+- Known limitation/status: the tablet was at the Welcome screen after installation, so an authenticated manual walkthrough of the new Diary controls was not completed. Status remains `NEEDS_REVIEW` pending that walkthrough; no data or authentication state was modified.
+- Next unblocked task after review: Phase 6, Task 6.4 Diary sync, pending separate user approval.
+
+### 2026-07-14 — Phase 7 self-care routines
+
+- Model: Sol (required because this task owns Room persistence, sync metadata, and local reminders).
+- Reading mode: continuing chat, different feature with insufficient context; read only the approved Phase 7 build-plan section, project overview, architecture, code standards, tracker, and directly involved task/reminder/Room/sync/notification/navigation/UI/test paths.
+- Files changed: self-care routine entity, DAO, Room database version 11 migration/schema, domain/repository/use cases, local reminder scheduler/receiver, application and manifest wiring, navigation, Self-care screen/ViewModel, focused unit/migration/reminder tests, and this tracker.
+- Behaviour: added local-first routines with name, description, category, optional reminder time, repeat days, optional checklist, active/paused state, completion history, edit, confirmation-gated delete, and calm empty/loading/error states. Saves write Room and a stable pending `SELF_CARE_ROUTINE` sync change together. Active timed routines schedule private generic device reminders; pause/delete cancels them.
+- Privacy and safety: reminder notifications contain no routine or personal details. No medical guidance, diagnosis, prediction, or new authentication/security contract was introduced.
+- Verification: `./gradlew testDebugUnitTest assembleDebug --console=plain` — PASS; `./gradlew connectedDebugAndroidTest --console=plain` — PASS with 32 tests on `SM-X115 - 16`, including migration 10→11; `git diff --check` and focused secret checks — PASS.
+- Live verification/status: reinstalled the APK, restored the authenticated session, opened the Self-care destination, verified the empty state, bottom-dock route, and New routine editor fields on the tablet. No temporary routine was saved. Production Supabase processing for the new routine record type remains outside this task until a remote schema/RLS processor is separately approved. Status: `NEEDS_REVIEW`.
+- Next unblocked task after review: Phase 8.1 Parser foundation, pending separate user approval.

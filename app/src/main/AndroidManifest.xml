@@ -32,6 +32,18 @@
             android:name=".core.notifications.TaskReminderReceiver"
             android:exported="false" />
         <receiver
+            android:name=".core.notifications.SelfCareReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".core.notifications.SelfCareReminderReconciliationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".core.notifications.HealthAlertNotificationReceiver"
             android:exported="false" />
         <receiver
