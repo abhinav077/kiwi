@@ -10,6 +10,17 @@ import com.abhinavsirohi.kiwi.data.repository.RoomRestoreDatabaseWriter
 import com.abhinavsirohi.kiwi.domain.model.RecordMetadata
 import com.abhinavsirohi.kiwi.domain.model.SyncState
 import com.abhinavsirohi.kiwi.domain.model.Task
+import com.abhinavsirohi.kiwi.domain.model.Profile
+import com.abhinavsirohi.kiwi.domain.model.Subtask
+import com.abhinavsirohi.kiwi.domain.model.CycleRecord
+import com.abhinavsirohi.kiwi.domain.model.WellnessDailyRecord
+import com.abhinavsirohi.kiwi.domain.model.HealthAlertEpisode
+import com.abhinavsirohi.kiwi.domain.model.HealthPatternType
+import com.abhinavsirohi.kiwi.domain.model.HealthAlertState
+import com.abhinavsirohi.kiwi.domain.model.DiaryEntry
+import com.abhinavsirohi.kiwi.domain.model.SelfCareRoutine
+import com.abhinavsirohi.kiwi.domain.model.TaskPostponement
+import com.abhinavsirohi.kiwi.domain.model.WeeklyReflection
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -74,6 +85,46 @@ class RoomRestoreDatabaseWriterTest {
         assertTrue(database.taskDao().observeActiveTasks(USER_ID).first().isEmpty())
     }
 
+    @Test
+    fun fullSnapshot_restoresProfileAndEverySupportedRecordFamily() = runBlocking {
+        val result = writer.applySnapshot(
+            RestoreSnapshot(
+                profile = Profile("profile-1", USER_ID, "Kiwi user", 1_000L, 2_000L),
+                tasks = listOf(remoteTask("task-1", "Task", 2_000L)),
+                subtasks = listOf(Subtask("subtask-1", "task-1", "Step", metadata = metadata())),
+                cycleRecords = listOf(CycleRecord("cycle-1", "2026-07-01", metadata = metadata())),
+                wellnessDailyRecords = listOf(
+                    WellnessDailyRecord("daily-1", "2026-07-01", cycleLocalId = "cycle-1", metadata = metadata()),
+                ),
+                healthAlertEpisodes = listOf(
+                    HealthAlertEpisode(
+                        "alert-1", HealthPatternType.RepeatedHighPain, "cycle-1", 2,
+                        "2026-07-01", "2026-07-02", HealthAlertState.Acknowledged, metadata = metadata(),
+                    ),
+                ),
+                diaryEntries = listOf(DiaryEntry("diary-1", "Day", "Entry", "2026-07-01", metadata = metadata())),
+                selfCareRoutines = listOf(SelfCareRoutine("routine-1", "Pause", metadata = metadata())),
+                taskPostponements = listOf(
+                    TaskPostponement(
+                        "move-1", "task-1", "Task", "2026-07-01", "2026-07-02", 2_000L, metadata(),
+                    ),
+                ),
+                weeklyReflections = listOf(WeeklyReflection("week-1", "2026-06-30", "Steady", metadata())),
+            ),
+        )
+
+        assertEquals(10, result.restoredRecords)
+        assertEquals("Kiwi user", database.profileDao().findByUserId(USER_ID)?.preferredName)
+        assertNotNull(database.taskDao().findSubtask("subtask-1"))
+        assertNotNull(database.wellnessDao().findCycleRecord("cycle-1"))
+        assertNotNull(database.wellnessDao().findDailyRecord("daily-1"))
+        assertNotNull(database.healthAlertDao().find("alert-1"))
+        assertNotNull(database.diaryDao().find("diary-1"))
+        assertNotNull(database.selfCareDao().find("routine-1"))
+        assertNotNull(database.reviewDao().findPostponement("move-1"))
+        assertNotNull(database.reviewDao().findReflectionByLocalId("week-1"))
+    }
+
     private fun localTask(localId: String, updatedAt: Long) = TaskEntity(
         localId = localId,
         title = "Local value",
@@ -103,6 +154,15 @@ class RoomRestoreDatabaseWriterTest {
             syncState = SyncState.Synced,
             deviceId = "remote-device",
         ),
+    )
+
+    private fun metadata(updatedAt: Long = 2_000L) = RecordMetadata(
+        remoteId = "remote-record",
+        userId = USER_ID,
+        createdAt = 1_000L,
+        updatedAt = updatedAt,
+        syncState = SyncState.Synced,
+        deviceId = "remote-device",
     )
 
     private companion object {

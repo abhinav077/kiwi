@@ -20,12 +20,28 @@ interface PendingChangeDao {
     )
     suspend fun getEligible(now: Long, limit: Int): List<PendingChangeEntity>
 
+    @Query(
+        "SELECT * FROM pending_changes " +
+            "WHERE state = 'PENDING' AND record_type != 'DIARY_PHOTO' AND next_attempt_at <= :now " +
+            "ORDER BY updated_at LIMIT :limit",
+    )
+    suspend fun getEligibleGeneric(now: Long, limit: Int): List<PendingChangeEntity>
+
     @Query("UPDATE pending_changes SET state = 'PROCESSING' WHERE queue_id IN (:queueIds)")
     suspend fun markProcessing(queueIds: List<String>)
 
     @Transaction
     suspend fun claimEligible(now: Long, limit: Int): List<PendingChangeEntity> {
         val changes = getEligible(now, limit)
+        if (changes.isNotEmpty()) {
+            markProcessing(changes.map(PendingChangeEntity::queueId))
+        }
+        return changes.map { it.copy(state = SyncQueueState.PROCESSING) }
+    }
+
+    @Transaction
+    suspend fun claimEligibleGeneric(now: Long, limit: Int): List<PendingChangeEntity> {
+        val changes = getEligibleGeneric(now, limit)
         if (changes.isNotEmpty()) {
             markProcessing(changes.map(PendingChangeEntity::queueId))
         }
@@ -57,21 +73,33 @@ interface PendingChangeDao {
     @Query("SELECT COUNT(*) FROM pending_changes")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM pending_changes WHERE state = 'PENDING'")
+    fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pending_changes WHERE state = 'PENDING' AND record_type != 'DIARY_PHOTO'")
+    fun observeGenericPendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pending_changes WHERE state = 'PROCESSING'")
+    fun observeProcessingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pending_changes WHERE state = 'FAILED'")
+    fun observeFailedCount(): Flow<Int>
+
     @Query(
         "SELECT COUNT(*) FROM pending_changes " +
-            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'PENDING'",
+        "WHERE record_type IN ('TASK', 'SUBTASK', 'TASK_POSTPONEMENT') AND state = 'PENDING'",
     )
     fun observePlannerPendingCount(): Flow<Int>
 
     @Query(
         "SELECT COUNT(*) FROM pending_changes " +
-            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'PROCESSING'",
+        "WHERE record_type IN ('TASK', 'SUBTASK', 'TASK_POSTPONEMENT') AND state = 'PROCESSING'",
     )
     fun observePlannerProcessingCount(): Flow<Int>
 
     @Query(
         "SELECT COUNT(*) FROM pending_changes " +
-            "WHERE record_type IN ('TASK', 'SUBTASK') AND state = 'FAILED'",
+        "WHERE record_type IN ('TASK', 'SUBTASK', 'TASK_POSTPONEMENT') AND state = 'FAILED'",
     )
     fun observePlannerFailedCount(): Flow<Int>
 }

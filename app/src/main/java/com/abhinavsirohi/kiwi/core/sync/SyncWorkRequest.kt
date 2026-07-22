@@ -6,6 +6,8 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.BackoffPolicy
+import java.util.concurrent.TimeUnit
 
 object SyncWorkRequest {
     const val UNIQUE_WORK_NAME = "kiwi-pending-sync"
@@ -16,6 +18,7 @@ object SyncWorkRequest {
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build(),
         )
+        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
         .build()
 
     fun enqueue(workManager: WorkManager) {

@@ -12,6 +12,7 @@ import com.abhinavsirohi.kiwi.core.sync.SyncRecordType
 import com.abhinavsirohi.kiwi.data.local.entity.PendingChangeEntity
 import com.abhinavsirohi.kiwi.data.local.entity.SubtaskEntity
 import com.abhinavsirohi.kiwi.data.local.entity.TaskEntity
+import com.abhinavsirohi.kiwi.data.local.entity.TaskPostponementEntity
 import com.abhinavsirohi.kiwi.data.remote.RemoteResult
 import com.abhinavsirohi.kiwi.data.remote.SessionProvider
 import com.abhinavsirohi.kiwi.data.remote.SupabaseSessionProvider
@@ -31,6 +32,7 @@ import com.abhinavsirohi.kiwi.domain.model.validateRecurrenceRule
 import com.abhinavsirohi.kiwi.domain.repository.TaskRepository
 import io.github.jan.supabase.SupabaseClient
 import java.util.UUID
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -159,10 +161,24 @@ class RoomTaskRepository(
                     deviceId = deviceId,
                 ),
             )
+            val postponement = createPostponement(existing, updated, userId, now)
             var nextOccurrence: TaskEntity? = null
             database.withTransaction {
                 database.taskDao().upsertTask(updated)
                 enqueueTask(updated, SyncOperation.UPSERT)
+                postponement?.let { event ->
+                    database.reviewDao().upsertPostponement(event)
+                    database.pendingChangeDao().enqueue(
+                        PendingChangeEntity(
+                            queueId = "TASK_POSTPONEMENT:${event.localId}",
+                            recordType = SyncRecordType.TASK_POSTPONEMENT,
+                            recordLocalId = event.localId,
+                            operation = SyncOperation.UPSERT,
+                            createdAt = event.syncMetadata.createdAt,
+                            updatedAt = event.syncMetadata.updatedAt,
+                        ),
+                    )
+                }
                 if (!existing.isCompleted && updated.isCompleted) {
                     nextOccurrence = generateNextOccurrence(updated, userId, now)
                 }
@@ -336,6 +352,31 @@ class RoomTaskRepository(
             enqueueSubtask(copy, SyncOperation.UPSERT)
         }
         return nextTask
+    }
+
+    private fun createPostponement(
+        existing: TaskEntity,
+        updated: TaskEntity,
+        userId: String,
+        now: Long,
+    ): TaskPostponementEntity? {
+        val previous = existing.scheduledDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        val next = updated.scheduledDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        if (!next.isAfter(previous)) return null
+        return TaskPostponementEntity(
+            localId = newLocalId(),
+            taskLocalId = updated.localId,
+            taskTitle = updated.title,
+            previousDate = previous.toString(),
+            newDate = next.toString(),
+            postponedAt = now,
+            syncMetadata = SyncMetadata(
+                userId = userId,
+                createdAt = now,
+                updatedAt = now,
+                deviceId = deviceId,
+            ),
+        )
     }
 
     private suspend fun enqueueTask(entity: TaskEntity, operation: SyncOperation) {

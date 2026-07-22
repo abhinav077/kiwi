@@ -80,6 +80,22 @@ class SyncQueueDatabaseTest {
     }
 
     @Test
+    fun genericClaim_excludesDiaryPhotos() = runBlocking {
+        val dao = database.pendingChangeDao()
+        dao.enqueue(change())
+        dao.enqueue(
+            change().copy(
+                queueId = "DIARY_PHOTO:photo-1",
+                recordType = SyncRecordType.DIARY_PHOTO,
+                recordLocalId = "photo-1",
+            ),
+        )
+
+        assertEquals(listOf(SyncRecordType.TASK), dao.claimEligibleGeneric(1_000L, 10).map { it.recordType })
+        assertEquals(SyncQueueState.PENDING, dao.findById("DIARY_PHOTO:photo-1")?.state)
+    }
+
+    @Test
     fun plannerQueueState_isObservableAndExcludesNonPlannerRecords() = runBlocking {
         val dao = database.pendingChangeDao()
         dao.enqueue(change())

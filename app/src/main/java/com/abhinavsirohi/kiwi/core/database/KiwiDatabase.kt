@@ -22,6 +22,9 @@ import com.abhinavsirohi.kiwi.data.local.dao.DiaryDao
 import com.abhinavsirohi.kiwi.data.local.entity.DiaryPhotoEntity
 import com.abhinavsirohi.kiwi.data.local.dao.SelfCareDao
 import com.abhinavsirohi.kiwi.data.local.entity.SelfCareRoutineEntity
+import com.abhinavsirohi.kiwi.data.local.dao.ReviewDao
+import com.abhinavsirohi.kiwi.data.local.entity.TaskPostponementEntity
+import com.abhinavsirohi.kiwi.data.local.entity.WeeklyReflectionEntity
 
 @Database(
     entities = [
@@ -35,8 +38,10 @@ import com.abhinavsirohi.kiwi.data.local.entity.SelfCareRoutineEntity
         DiaryEntryEntity::class,
         DiaryPhotoEntity::class,
         SelfCareRoutineEntity::class,
+        TaskPostponementEntity::class,
+        WeeklyReflectionEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(KiwiTypeConverters::class)
@@ -54,6 +59,8 @@ abstract class KiwiDatabase : RoomDatabase() {
     abstract fun diaryDao(): DiaryDao
 
     abstract fun selfCareDao(): SelfCareDao
+
+    abstract fun reviewDao(): ReviewDao
 
     companion object {
         const val DATABASE_NAME = "kiwi.db"
@@ -240,6 +247,38 @@ abstract class KiwiDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `task_postponements` (" +
+                        "`localId` TEXT NOT NULL, `task_local_id` TEXT NOT NULL, `task_title` TEXT NOT NULL, " +
+                        "`previous_date` TEXT NOT NULL, `new_date` TEXT NOT NULL, `postponed_at` INTEGER NOT NULL, " +
+                        "`remote_id` TEXT, `user_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `sync_status` TEXT NOT NULL, " +
+                        "`last_sync_error` TEXT, `device_id` TEXT NOT NULL, PRIMARY KEY(`localId`))",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_task_postponements_user_id_postponed_at` " +
+                        "ON `task_postponements` (`user_id`, `postponed_at`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_task_postponements_task_local_id` " +
+                        "ON `task_postponements` (`task_local_id`)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `weekly_reflections` (" +
+                        "`localId` TEXT NOT NULL, `week_start` TEXT NOT NULL, `content` TEXT NOT NULL, " +
+                        "`remote_id` TEXT, `user_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `sync_status` TEXT NOT NULL, " +
+                        "`last_sync_error` TEXT, `device_id` TEXT NOT NULL, PRIMARY KEY(`localId`))",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_weekly_reflections_user_id_week_start` " +
+                        "ON `weekly_reflections` (`user_id`, `week_start`)",
+                )
+            }
+        }
+
         val MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -251,6 +290,7 @@ abstract class KiwiDatabase : RoomDatabase() {
             MIGRATION_8_9,
             MIGRATION_9_10,
             MIGRATION_10_11,
+            MIGRATION_11_12,
         )
     }
 }

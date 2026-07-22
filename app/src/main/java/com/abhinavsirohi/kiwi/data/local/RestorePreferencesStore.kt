@@ -22,6 +22,10 @@ class RestorePreferencesStore(
         }
     }
 
+    suspend fun clearAll() {
+        context.restoreDataStore.edit { it.clear() }
+    }
+
     private companion object {
         val RESTORED_USER_IDS = stringSetPreferencesKey("restored_user_ids")
     }

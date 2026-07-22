@@ -10,6 +10,8 @@ enum class SyncRecordType {
     DIARY_ENTRY,
     DIARY_PHOTO,
     SELF_CARE_ROUTINE,
+    TASK_POSTPONEMENT,
+    WEEKLY_REFLECTION,
 }
 
 enum class SyncOperation {

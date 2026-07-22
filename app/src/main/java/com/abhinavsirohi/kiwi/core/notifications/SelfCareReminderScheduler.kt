@@ -21,10 +21,10 @@ import com.abhinavsirohi.kiwi.domain.model.SelfCareDay
 import com.abhinavsirohi.kiwi.domain.model.SelfCareRoutine
 import com.abhinavsirohi.kiwi.domain.model.SyncState
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.ZoneId
+import com.abhinavsirohi.kiwi.data.local.notificationContentIsHidden
 
 interface SelfCareReminderScheduler {
     fun schedule(routine: SelfCareRoutine)
@@ -79,9 +79,10 @@ class SelfCareReminderReceiver : BroadcastReceiver() {
             .setContentTitle("Kiwi self-care reminder")
             .setContentText("A small moment for yourself is waiting.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(if (notificationContentIsHidden(context)) NotificationCompat.VISIBILITY_SECRET else NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .build()
-        NotificationManagerCompat.from(context).notify(routineId.hashCode(), notification)
+        postNotificationIfPermitted(context, routineId.hashCode(), notification)
     }
 }
 
@@ -98,16 +99,24 @@ class SelfCareReminderReconciliationWorker(context: Context, parameters: WorkerP
 class SelfCareReminderReconciliationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action in ACTIONS) {
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "kiwi-self-care-reminder-reconciliation",
-                ExistingWorkPolicy.REPLACE,
-                OneTimeWorkRequestBuilder<SelfCareReminderReconciliationWorker>().build(),
-            )
+            SelfCareReminderReconciliationWorkRequest.enqueue(context)
         }
     }
 
     private companion object {
         val ACTIONS = setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIMEZONE_CHANGED)
+    }
+}
+
+object SelfCareReminderReconciliationWorkRequest {
+    const val UNIQUE_WORK_NAME = "kiwi-self-care-reminder-reconciliation"
+
+    fun enqueue(context: Context) {
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            UNIQUE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<SelfCareReminderReconciliationWorker>().build(),
+        )
     }
 }
 

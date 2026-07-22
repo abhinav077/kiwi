@@ -108,6 +108,30 @@ class RoomTaskRepositoryTest {
     }
 
     @Test
+    fun movingScheduledTaskLater_recordsOnePostponementTransactionally() = runBlocking {
+        val created = repository.createTask(
+            NewTask(title = "Dentist", scheduledDate = "2026-07-21"),
+        ) as AppResult.Success
+
+        now = 3_000L
+        assertTrue(repository.saveTask(created.value.copy(scheduledDate = "2026-07-25")) is AppResult.Success)
+        val events = database.reviewDao().observePostponements("user-1").first()
+
+        assertEquals(1, events.size)
+        assertEquals("Dentist", events.single().taskTitle)
+        assertEquals("2026-07-21", events.single().previousDate)
+        assertEquals("2026-07-25", events.single().newDate)
+        assertEquals(
+            SyncOperation.UPSERT,
+            database.pendingChangeDao().findById("TASK_POSTPONEMENT:${events.single().localId}")?.operation,
+        )
+
+        now = 4_000L
+        assertTrue(repository.saveTask(created.value.copy(scheduledDate = "2026-07-20")) is AppResult.Success)
+        assertEquals(1, database.reviewDao().observePostponements("user-1").first().size)
+    }
+
+    @Test
     fun reminderReconciliationSource_returnsOnlyActiveTimedIncompleteTasks() = runBlocking {
         val timed = repository.createTask(
             NewTask(title = "Timed", scheduledDate = "2026-07-15", scheduledTimeMinutes = 9 * 60),

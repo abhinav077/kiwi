@@ -13,6 +13,9 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE user_id = :userId LIMIT 1")
     suspend fun findByUserId(userId: String): ProfileEntity?
 
+    @Query("SELECT * FROM profiles WHERE localId = :localId LIMIT 1")
+    suspend fun findByLocalId(localId: String): ProfileEntity?
+
     @Query("SELECT EXISTS(SELECT 1 FROM profiles LIMIT 1)")
     suspend fun hasAnyProfile(): Boolean
 

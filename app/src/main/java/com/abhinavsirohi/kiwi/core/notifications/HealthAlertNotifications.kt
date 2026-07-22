@@ -8,11 +8,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.abhinavsirohi.kiwi.domain.model.HealthAlertEpisode
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import com.abhinavsirohi.kiwi.data.local.notificationContentIsHidden
 
 data class PlannedHealthAlertNotification(val episodeId: String, val triggerAtMillis: Long)
 
@@ -66,9 +66,10 @@ class HealthAlertNotificationReceiver : BroadcastReceiver() {
             .setContentTitle("Kiwi wellness note")
             .setContentText("A recorded pattern may be worth reviewing in Kiwi.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(if (notificationContentIsHidden(context)) NotificationCompat.VISIBILITY_SECRET else NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .build()
-        NotificationManagerCompat.from(context).notify(episodeId.hashCode(), notification)
+        postNotificationIfPermitted(context, episodeId.hashCode(), notification)
     }
 }
 

@@ -229,6 +229,18 @@ class KiwiDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate8To9_preservesExistingDataAndCreatesDiaryEntries() {
+        helper.createDatabase(TEST_DATABASE, 8).close()
+
+        helper.runMigrationsAndValidate(TEST_DATABASE, 9, true, KiwiDatabase.MIGRATION_8_9).use { database ->
+            database.query("SELECT COUNT(*) FROM diary_entries").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
     fun migrate9To10_preservesDiaryEntriesAndCreatesDiaryPhotos() {
         helper.createDatabase(TEST_DATABASE, 9).apply {
             execSQL(
@@ -275,6 +287,67 @@ class KiwiDatabaseMigrationTest {
                 assertEquals(0, cursor.getInt(0))
             }
             database.query("SELECT COUNT(*) FROM self_care_routines").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate11To12_preservesTasksAndCreatesReviewRecords() {
+        helper.createDatabase(TEST_DATABASE, 11).apply {
+            execSQL(
+                "INSERT INTO tasks (localId, title, description, category, priority, notes, " +
+                    "scheduledDate, scheduledTimeMinutes, recurrenceFrequency, recurrenceInterval, " +
+                    "recurrenceEndDate, recurrenceSeriesId, isCompleted, position, remote_id, user_id, " +
+                    "created_at, updated_at, deleted_at, sync_status, last_sync_error, device_id) VALUES " +
+                    "('task-11', 'Keep for review', NULL, 'PERSONAL', 'NORMAL', NULL, " +
+                    "'2026-07-21', NULL, 'NONE', 1, NULL, NULL, 0, 0, NULL, 'user-1', 1000, 1000, " +
+                    "NULL, 'PENDING', NULL, 'device-1')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DATABASE, 12, true, KiwiDatabase.MIGRATION_11_12).use { database ->
+            database.query("SELECT title FROM tasks WHERE localId = 'task-11'").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("Keep for review", cursor.getString(0))
+            }
+            database.query("SELECT COUNT(*) FROM task_postponements").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+            database.query("SELECT COUNT(*) FROM weekly_reflections").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate1To12_preservesOriginalTaskAcrossEveryMigration() {
+        helper.createDatabase(TEST_DATABASE, 1).apply {
+            execSQL(
+                "INSERT INTO tasks (localId, title, notes, scheduledDate, isCompleted, position, " +
+                    "remote_id, user_id, created_at, updated_at, deleted_at, sync_status, " +
+                    "last_sync_error, device_id) VALUES " +
+                    "('task-chain', 'Keep through every migration', NULL, NULL, 0, 0, NULL, " +
+                    "'user-1', 1000, 1000, NULL, 'PENDING', NULL, 'device-1')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            12,
+            true,
+            *KiwiDatabase.MIGRATIONS,
+        ).use { database ->
+            database.query("SELECT title FROM tasks WHERE localId = 'task-chain'").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("Keep through every migration", cursor.getString(0))
+            }
+            database.query("SELECT COUNT(*) FROM weekly_reflections").use { cursor ->
                 cursor.moveToFirst()
                 assertEquals(0, cursor.getInt(0))
             }

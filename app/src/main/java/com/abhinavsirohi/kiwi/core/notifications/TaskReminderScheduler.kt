@@ -8,8 +8,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.abhinavsirohi.kiwi.domain.model.Task
+import com.abhinavsirohi.kiwi.data.local.notificationContentIsHidden
 
 interface TaskReminderScheduler {
     fun schedule(task: Task)
@@ -56,9 +56,10 @@ class TaskReminderReceiver : BroadcastReceiver() {
             .setContentText(content.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(if (notificationContentIsHidden(context)) NotificationCompat.VISIBILITY_SECRET else NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .build()
-        NotificationManagerCompat.from(context).notify(taskLocalId.hashCode(), notification)
+        postNotificationIfPermitted(context, taskLocalId.hashCode(), notification)
     }
 }
 

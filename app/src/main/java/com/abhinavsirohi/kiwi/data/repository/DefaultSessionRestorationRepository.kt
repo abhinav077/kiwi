@@ -7,12 +7,14 @@ import com.abhinavsirohi.kiwi.data.remote.SessionProvider
 import com.abhinavsirohi.kiwi.domain.model.SessionRestoration
 import com.abhinavsirohi.kiwi.domain.model.SessionRestorationFailure
 import com.abhinavsirohi.kiwi.domain.repository.SessionRestorationRepository
+import com.abhinavsirohi.kiwi.core.sync.restore.RestoreState
 
 class DefaultSessionRestorationRepository(
     private val sessionProvider: SessionProvider,
     private val approvedUserRepository: ApprovedUserRepository,
     private val localProfiles: LocalProfileLookup,
     private val awaitSessionInitialization: suspend () -> Unit = {},
+    private val restoreCloudData: suspend () -> RestoreState = { RestoreState.NotRequired },
 ) : SessionRestorationRepository {
     override suspend fun restore(): SessionRestoration {
         awaitSessionInitialization()
@@ -28,10 +30,21 @@ class DefaultSessionRestorationRepository(
         return when (val result = approvedUserRepository.checkAccess()) {
             is RemoteResult.Success -> when (result.value) {
                 is ApprovedUserAccess.Approved -> {
-                    if (!localProfiles.hasProfileFor(session.userId)) {
-                        SessionRestoration.NeedsProfileSetup
-                    } else {
-                        SessionRestoration.OpenToday(offline = false)
+                    when (val cloudRestore = restoreCloudData()) {
+                        RestoreState.NotRequired,
+                        is RestoreState.Completed,
+                        -> if (!localProfiles.hasProfileFor(session.userId)) {
+                            SessionRestoration.NeedsProfileSetup
+                        } else {
+                            SessionRestoration.OpenToday(offline = false)
+                        }
+                        is RestoreState.Rejected -> cloudRestore.error.toSessionFailure()
+                        is RestoreState.RetryableFailure -> SessionRestoration.RetryableFailure(
+                            SessionRestorationFailure.ServiceUnavailable,
+                        )
+                        RestoreState.Restoring -> SessionRestoration.RetryableFailure(
+                            SessionRestorationFailure.ServiceUnavailable,
+                        )
                     }
                 }
                 ApprovedUserAccess.Denied -> SessionRestoration.AccessDenied

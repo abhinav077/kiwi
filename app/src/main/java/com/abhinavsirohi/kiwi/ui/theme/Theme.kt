@@ -8,6 +8,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.abhinavsirohi.kiwi.data.local.KiwiFontPreference
+import com.abhinavsirohi.kiwi.data.local.KiwiThemePreference
 
 private val KiwiDarkColorScheme = darkColorScheme(
     primary = KiwiSage,
@@ -41,6 +43,38 @@ private val KiwiLightColorScheme = lightColorScheme(
     outline = KiwiWarmGray
 )
 
+private val KiwiSunriseColorScheme = lightColorScheme(
+    primary = Color(0xFF8B3F48),
+    onPrimary = KiwiWhite,
+    secondary = KiwiCoralRose,
+    onSecondary = KiwiCharcoal,
+    tertiary = KiwiButter,
+    onTertiary = KiwiCharcoal,
+    background = Color(0xFFFFF3E8),
+    onBackground = KiwiCharcoal,
+    surface = Color(0xFFFFFBF5),
+    onSurface = KiwiCharcoal,
+    surfaceVariant = KiwiPeach,
+    onSurfaceVariant = KiwiCharcoal,
+    outline = KiwiWarmGray,
+)
+
+private val KiwiGroveColorScheme = lightColorScheme(
+    primary = KiwiForest,
+    onPrimary = KiwiWhite,
+    secondary = Color(0xFF668052),
+    onSecondary = KiwiWhite,
+    tertiary = KiwiPowderBlue,
+    onTertiary = KiwiCharcoal,
+    background = Color(0xFFF3F4E8),
+    onBackground = KiwiCharcoal,
+    surface = Color(0xFFFCFAF0),
+    onSurface = KiwiCharcoal,
+    surfaceVariant = KiwiPistachio,
+    onSurfaceVariant = KiwiCharcoal,
+    outline = KiwiWarmGray,
+)
+
 val KiwiShapes = Shapes(
     small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
     medium = androidx.compose.foundation.shape.RoundedCornerShape(KiwiDimensions.standardCardRadius),
@@ -49,12 +83,20 @@ val KiwiShapes = Shapes(
 
 @Composable
 fun KiwiTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themePreference: KiwiThemePreference = KiwiThemePreference.SYSTEM,
+    fontPreference: KiwiFontPreference = KiwiFontPreference.SYSTEM,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = when (themePreference) {
+        KiwiThemePreference.SYSTEM -> if (isSystemInDarkTheme()) KiwiDarkColorScheme else KiwiLightColorScheme
+        KiwiThemePreference.LIGHT -> KiwiLightColorScheme
+        KiwiThemePreference.DARK -> KiwiDarkColorScheme
+        KiwiThemePreference.SUNRISE -> KiwiSunriseColorScheme
+        KiwiThemePreference.GROVE -> KiwiGroveColorScheme
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) KiwiDarkColorScheme else KiwiLightColorScheme,
-        typography = KiwiTypography,
+        colorScheme = colorScheme,
+        typography = kiwiTypography(fontPreference),
         shapes = KiwiShapes,
         content = content
     )

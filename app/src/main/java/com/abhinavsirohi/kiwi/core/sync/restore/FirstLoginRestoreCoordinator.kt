@@ -37,8 +37,18 @@ class FirstLoginRestoreCoordinator(
     }
 
     private fun RestoreSnapshot.belongsTo(userId: String): Boolean =
-        tasks.all { it.metadata.userId == userId } &&
-            subtasks.all { it.metadata.userId == userId }
+        (profile == null || profile.userId == userId) &&
+            listOf(
+                tasks.map { it.metadata.userId },
+                subtasks.map { it.metadata.userId },
+                cycleRecords.map { it.metadata.userId },
+                wellnessDailyRecords.map { it.metadata.userId },
+                healthAlertEpisodes.map { it.metadata.userId },
+                diaryEntries.map { it.metadata.userId },
+                selfCareRoutines.map { it.metadata.userId },
+                taskPostponements.map { it.metadata.userId },
+                weeklyReflections.map { it.metadata.userId },
+            ).flatten().all { it == userId }
 
     private fun RemoteError.toRestoreFailure(): RestoreState = when (this) {
         RemoteError.AuthenticationRequired,

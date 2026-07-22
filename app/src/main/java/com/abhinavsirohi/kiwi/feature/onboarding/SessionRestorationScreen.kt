@@ -24,10 +24,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.abhinavsirohi.kiwi.KiwiApplication
 import com.abhinavsirohi.kiwi.core.design.KiwiBackground
 import com.abhinavsirohi.kiwi.core.notifications.TaskReminderReconciliationWorkRequest
+import com.abhinavsirohi.kiwi.core.notifications.SelfCareReminderReconciliationWorkRequest
+import com.abhinavsirohi.kiwi.core.sync.restore.FirstLoginRestoreCoordinator
+import com.abhinavsirohi.kiwi.data.local.RestorePreferencesStore
 import com.abhinavsirohi.kiwi.data.remote.RemoteResult
 import com.abhinavsirohi.kiwi.data.remote.SessionProvider
 import com.abhinavsirohi.kiwi.data.remote.SupabaseSessionProvider
+import com.abhinavsirohi.kiwi.data.remote.SupabaseRestoreRemoteDataSource
 import com.abhinavsirohi.kiwi.data.repository.DefaultSessionRestorationRepository
+import com.abhinavsirohi.kiwi.data.repository.RoomRestoreDatabaseWriter
 import com.abhinavsirohi.kiwi.data.repository.RoomLocalProfileLookup
 import com.abhinavsirohi.kiwi.data.repository.SupabaseApprovedUserRepository
 import com.abhinavsirohi.kiwi.domain.usecase.session.RestoreSession
@@ -45,13 +50,24 @@ fun SessionRestorationRoute(
 ) {
     val application = LocalContext.current.applicationContext as KiwiApplication
     val clientResult = application.supabaseClient
-    val repository = DefaultSessionRestorationRepository(
-        sessionProvider = when (clientResult) {
-            is RemoteResult.Success -> SupabaseSessionProvider(clientResult.value)
-            is RemoteResult.Failure -> object : SessionProvider {
-                override fun currentSession() = clientResult
-            }
+    val sessionProvider = when (clientResult) {
+        is RemoteResult.Success -> SupabaseSessionProvider(clientResult.value)
+        is RemoteResult.Failure -> object : SessionProvider {
+            override fun currentSession() = clientResult
+        }
+    }
+    val cloudRestore = FirstLoginRestoreCoordinator(
+        sessionProvider = sessionProvider,
+        remoteDataSource = SupabaseRestoreRemoteDataSource(clientResult, sessionProvider),
+        databaseWriter = RoomRestoreDatabaseWriter(application.database),
+        reminderRecreator = {
+            TaskReminderReconciliationWorkRequest.enqueue(application)
+            SelfCareReminderReconciliationWorkRequest.enqueue(application)
         },
+        restoreStateStore = RestorePreferencesStore(application),
+    )
+    val repository = DefaultSessionRestorationRepository(
+        sessionProvider = sessionProvider,
         approvedUserRepository = SupabaseApprovedUserRepository(clientResult),
         localProfiles = RoomLocalProfileLookup(application.database.profileDao()),
         awaitSessionInitialization = {
@@ -59,6 +75,7 @@ fun SessionRestorationRoute(
                 clientResult.value.auth.awaitInitialization()
             }
         },
+        restoreCloudData = cloudRestore::restoreIfRequired,
     )
     val restorationViewModel: SessionRestorationViewModel = viewModel(
         factory = SessionRestorationViewModel.Factory(

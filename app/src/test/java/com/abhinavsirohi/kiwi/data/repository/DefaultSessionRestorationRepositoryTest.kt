@@ -6,6 +6,7 @@ import com.abhinavsirohi.kiwi.data.remote.RemoteResult
 import com.abhinavsirohi.kiwi.data.remote.SessionProvider
 import com.abhinavsirohi.kiwi.domain.model.SessionRestoration
 import com.abhinavsirohi.kiwi.domain.model.SessionRestorationFailure
+import com.abhinavsirohi.kiwi.core.sync.restore.RestoreState
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -102,6 +103,54 @@ class DefaultSessionRestorationRepositoryTest {
         repository.restore()
 
         assertEquals(listOf("initialized", "session"), events)
+    }
+
+    @Test
+    fun approvedSession_restoresCloudBeforeCheckingForLocalProfile() = runBlocking {
+        val events = mutableListOf<String>()
+        var restored = false
+        val repository = DefaultSessionRestorationRepository(
+            sessionProvider = object : SessionProvider {
+                override fun currentSession() = RemoteResult.Success(session)
+            },
+            approvedUserRepository = SessionRestoreApprovedUserRepository(
+                RemoteResult.Success(ApprovedUserAccess.Approved(session)),
+            ),
+            localProfiles = object : LocalProfileLookup {
+                override suspend fun hasProfileFor(userId: String): Boolean {
+                    events += "profile"
+                    return restored
+                }
+                override suspend fun hasAnyProfile() = restored
+            },
+            restoreCloudData = {
+                events += "cloud"
+                restored = true
+                RestoreState.Completed(restoredTasks = 1, restoredSubtasks = 0)
+            },
+        )
+
+        assertEquals(SessionRestoration.OpenToday(offline = false), repository.restore())
+        assertEquals(listOf("cloud", "profile"), events)
+    }
+
+    @Test
+    fun cloudRestoreFailure_doesNotOpenPartiallyRestoredData() = runBlocking {
+        val repository = DefaultSessionRestorationRepository(
+            sessionProvider = object : SessionProvider {
+                override fun currentSession() = RemoteResult.Success(session)
+            },
+            approvedUserRepository = SessionRestoreApprovedUserRepository(
+                RemoteResult.Success(ApprovedUserAccess.Approved(session)),
+            ),
+            localProfiles = FakeLocalProfileLookup(setOf(session.userId)),
+            restoreCloudData = { RestoreState.RetryableFailure(RemoteError.NetworkUnavailable) },
+        )
+
+        assertEquals(
+            SessionRestoration.RetryableFailure(SessionRestorationFailure.ServiceUnavailable),
+            repository.restore(),
+        )
     }
 
     private fun repository(

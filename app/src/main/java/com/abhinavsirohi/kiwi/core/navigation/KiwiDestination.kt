@@ -14,8 +14,9 @@ enum class KiwiDestination(
     Today(route = "today", label = "Today", symbol = "⌂"),
     Calendar(route = "calendar", label = "Calendar", symbol = "▦"),
     Wellness(route = "wellness", label = "Wellness", symbol = "✿"),
+    Review(route = "review", label = "Review", symbol = "◌", appearsInBottomDock = false),
     Diary(route = "diary", label = "Diary", symbol = "✎"),
-    Assistant(route = "assistant", label = "Ask Kiwi", symbol = "✦", appearsInBottomDock = false),
-    SelfCare(route = "self-care", label = "Self-care", symbol = "♡"),
-    More(route = "more", label = "More", symbol = "⋯", appearsInBottomDock = false)
+    SelfCare(route = "self-care", label = "Self-care", symbol = "♡", appearsInBottomDock = false),
+    Downloads(route = "downloads", label = "Downloads", symbol = "↓", appearsInBottomDock = false),
+    More(route = "more", label = "More", symbol = "⋯")
 }

@@ -4,10 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,11 +18,17 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -47,18 +53,52 @@ import com.abhinavsirohi.kiwi.feature.onboarding.SessionRestorationRoute
 import com.abhinavsirohi.kiwi.feature.today.TodayRoute
 import com.abhinavsirohi.kiwi.feature.calendar.CalendarRoute
 import com.abhinavsirohi.kiwi.feature.wellness.WellnessRoute
+import com.abhinavsirohi.kiwi.feature.review.ReviewRoute
 import com.abhinavsirohi.kiwi.feature.diary.DiaryRoute
 import com.abhinavsirohi.kiwi.feature.selfcare.SelfCareRoute
+import com.abhinavsirohi.kiwi.feature.settings.SettingsRoute
+import com.abhinavsirohi.kiwi.feature.downloads.PinterestDownloadsRoute
 import com.abhinavsirohi.kiwi.ui.theme.KiwiCharcoal
 import com.abhinavsirohi.kiwi.ui.theme.KiwiDimensions
 import com.abhinavsirohi.kiwi.ui.theme.KiwiSpacing
 import com.abhinavsirohi.kiwi.ui.theme.KiwiWarmGray
 
+private val bottomDockDestinations = listOf(
+    KiwiDestination.Today,
+    KiwiDestination.Calendar,
+    KiwiDestination.Diary,
+    KiwiDestination.Wellness,
+    KiwiDestination.More,
+)
+
 @Composable
-fun KiwiApp() {
+fun KiwiApp(
+    sharedText: String? = null,
+    onSharedTextConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
+    var moreSheetOpen by remember { mutableStateOf(false) }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val authenticatedRoutes = KiwiDestination.entries
+        .filterNot { it in setOf(
+            KiwiDestination.SessionRestore,
+            KiwiDestination.Welcome,
+            KiwiDestination.SignIn,
+            KiwiDestination.AccessGate,
+            KiwiDestination.ProfileSetup,
+        ) }
+        .map(KiwiDestination::route)
+
+    LaunchedEffect(sharedText, currentDestination?.route) {
+        if (
+            !sharedText.isNullOrBlank() &&
+            currentDestination?.route in authenticatedRoutes &&
+            currentDestination?.route != KiwiDestination.Downloads.route
+        ) {
+            navController.navigate(KiwiDestination.Downloads.route) { launchSingleTop = true }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -71,20 +111,27 @@ fun KiwiApp() {
             ) {
                 KiwiBottomDock(
                     currentDestination = currentDestination,
+                    moreSheetOpen = moreSheetOpen,
                     onDestinationSelected = { destination ->
-                        navController.navigateTo(destination)
-                    }
+                        if (destination == KiwiDestination.More) {
+                            moreSheetOpen = true
+                        } else {
+                            navController.navigateTo(destination)
+                        }
+                    },
                 )
             }
         }
     ) { innerPadding ->
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
             KiwiNavHost(
                 navController = navController,
+                sharedText = sharedText,
+                onSharedTextConsumed = onSharedTextConsumed,
                 modifier = Modifier
                     .fillMaxSize()
                     .widthIn(max = 720.dp)
@@ -92,11 +139,22 @@ fun KiwiApp() {
             )
         }
     }
+    if (moreSheetOpen) {
+        KiwiMoreSheet(
+            onDismiss = { moreSheetOpen = false },
+            onDestinationSelected = { destination ->
+                moreSheetOpen = false
+                navController.navigateTo(destination)
+            },
+        )
+    }
 }
 
 @Composable
 private fun KiwiNavHost(
     navController: NavHostController,
+    sharedText: String?,
+    onSharedTextConsumed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -168,21 +226,37 @@ private fun KiwiNavHost(
                 },
             )
         }
-        composable(KiwiDestination.Assistant.route) {
-            KiwiPlaceholderScreen(KiwiDestination.Assistant, message = "Ask Kiwi will be ready soon.")
+        composable(KiwiDestination.Wellness.route) { WellnessRoute() }
+        composable(KiwiDestination.Review.route) { ReviewRoute() }
+        composable(KiwiDestination.Diary.route) { DiaryRoute() }
+        composable(KiwiDestination.SelfCare.route) { SelfCareRoute() }
+        composable(KiwiDestination.Downloads.route) {
+            PinterestDownloadsRoute(
+                initialSharedText = sharedText,
+                onSharedTextConsumed = onSharedTextConsumed,
+                onBack = navController::popBackStack,
+            )
+        }
+        composable(KiwiDestination.More.route) {
+            SettingsRoute(
+                onOpenWellness = { navController.navigateTo(KiwiDestination.Wellness) },
+                onOpenReview = { navController.navigateTo(KiwiDestination.Review) },
+                onOpenSelfCare = { navController.navigateTo(KiwiDestination.SelfCare) },
+                onOpenDownloads = { navController.navigateTo(KiwiDestination.Downloads) },
+                onSignedOut = {
+                    navController.navigate(KiwiDestination.SignIn.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+            )
         }
         KiwiDestination.entries
-            .filter(KiwiDestination::appearsInBottomDock)
+            .filter { it.appearsInBottomDock && it !in setOf(KiwiDestination.Diary, KiwiDestination.More, KiwiDestination.Wellness) }
             .forEach { destination ->
                 composable(destination.route) {
                     when (destination) {
-                        KiwiDestination.Today -> TodayRoute(onAskKiwi = {
-                            navController.navigate(KiwiDestination.Assistant.route)
-                        })
+                        KiwiDestination.Today -> TodayRoute()
                         KiwiDestination.Calendar -> CalendarRoute()
-                        KiwiDestination.Wellness -> WellnessRoute()
-                        KiwiDestination.Diary -> DiaryRoute()
-                        KiwiDestination.SelfCare -> SelfCareRoute()
                         else -> KiwiPlaceholderScreen(destination = destination)
                     }
                 }
@@ -225,6 +299,7 @@ private fun KiwiPlaceholderScreen(
 @Composable
 private fun KiwiBottomDock(
     currentDestination: androidx.navigation.NavDestination?,
+    moreSheetOpen: Boolean,
     onDestinationSelected: (KiwiDestination) -> Unit
 ) {
     Surface(
@@ -244,12 +319,11 @@ private fun KiwiBottomDock(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            KiwiDestination.entries
-                .filter(KiwiDestination::appearsInBottomDock)
+            bottomDockDestinations
                 .forEach { destination ->
                     val selected = currentDestination?.hierarchy?.any {
                         it.route == destination.route
-                    } == true
+                    } == true || (destination == KiwiDestination.More && moreSheetOpen)
                     KiwiDockItem(
                         destination = destination,
                         selected = selected,
@@ -257,6 +331,75 @@ private fun KiwiBottomDock(
                     )
                 }
         }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun KiwiMoreSheet(
+    onDismiss: () -> Unit,
+    onDestinationSelected: (KiwiDestination) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = KiwiSpacing.xl, vertical = KiwiSpacing.sm)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(KiwiSpacing.xs),
+        ) {
+            Text(
+                text = "More of your space",
+                style = MaterialTheme.typography.headlineLarge,
+                color = KiwiCharcoal,
+                modifier = Modifier.padding(bottom = KiwiSpacing.sm),
+            )
+            KiwiMoreRow("◌", "Review & Reflections", "Look back at your recorded rhythm") {
+                onDestinationSelected(KiwiDestination.Review)
+            }
+            KiwiMoreRow("♡", "Self-care Routines", "Keep small rituals close") {
+                onDestinationSelected(KiwiDestination.SelfCare)
+            }
+            KiwiMoreRow("↓", "Pinterest Downloader", "Save a public Pin to your device") {
+                onDestinationSelected(KiwiDestination.Downloads)
+            }
+            KiwiMoreRow("⚙", "Settings", "Themes, privacy, and protection") {
+                onDestinationSelected(KiwiDestination.More)
+            }
+            Spacer(Modifier.height(KiwiSpacing.sm))
+        }
+    }
+}
+
+@Composable
+private fun KiwiMoreRow(
+    symbol: String,
+    label: String,
+    supporting: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            }
+            .padding(horizontal = KiwiSpacing.sm, vertical = KiwiSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = symbol,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = KiwiSpacing.md),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.titleLarge, color = KiwiCharcoal)
+            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = KiwiWarmGray)
+        }
+        Text("›", style = MaterialTheme.typography.titleLarge, color = KiwiWarmGray)
     }
 }
 
